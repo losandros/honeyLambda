@@ -46,6 +46,10 @@ def honeylambda(event, context):
     if config['alert']['slack']['enabled'] == "true":
         WEBHOOK_URL = config['alert']['slack']['webhook-url']
         slack_alerter(alertMessage, WEBHOOK_URL)
+    # Slack alert
+    if config['alert']['elk']['enabled'] == "true":
+        WEBHOOK_URL = config['alert']['elk']['webhook-url']
+        elk_alerter(alertMessage, WEBHOOK_URL)
     # Email alert
     if config['alert']['email']['enabled'] == "true":
         email_alerter(alertMessage, config)
@@ -411,6 +415,82 @@ def slack_alerter(msg, webhook_url):
 
     # Sending Slack message
     req = urllib2.Request(webhook_url, json.dumps(slack_message))
+
+    try:
+        resp = urllib2.urlopen(req)
+        logger.info("Message posted to Slack")
+    except urllib2.HTTPError as err:
+        logger.error("Request failed: {} {}".format(err.code, err.reason))
+    except urllib2.URLError as err:
+        logger.error("Connection failed: {}".format(err.reason))
+
+    return
+
+def elk_alerter(msg, webhook_url):
+    """ Send ELK alert """
+
+    now = time.strftime('%a, %d %b %Y %H:%M:%S %Z', time.localtime())
+    # Preparing Slack message
+    elk_message = {
+        "text": "*Honeytoken triggered!*\nA honeytoken has been triggered by {}".format(msg['source-ip']),
+        "username": "honeyλ",
+        "attachments": [
+            {
+                "color": "danger",
+                # "title": "Alert details",
+                "text": "Alert details:",
+                "footer": "honeyλ",
+                "footer_icon": "https://raw.githubusercontent.com/0x4D31/honeyLambda/master/docs/slack-footer.png",
+                "fields": [
+                    {
+                        "title": "Time",
+                        "value": now,
+                        "short": "true"
+                    },
+                    {
+                        "title": "Source IP Address",
+                        "value": msg['source-ip'],
+                        "short": "true"
+                    },
+                    {
+                        "title": "Threat Intel Report",
+                        "value": msg['threat-intel'] if msg['threat-intel'] else "None",
+                    },
+                    {
+                        "title": "User-Agent",
+                        "value": msg['user-agent']
+                    },
+                    {
+                        "title": "Token Note",
+                        "value": msg['token-note'],
+                        "short": "true"
+                    },
+                    {
+                        "title": "Token",
+                        "value": msg['token'],
+                        "short": "true"
+                    },
+                    {
+                        "title": "Viewer Details",
+                        "value": msg['viewer-details'],
+                        "short": "true"
+                    },
+                    {
+                        "title": "Path",
+                        "value": msg['path'],
+                        "short": "true"
+                    },
+                    {
+                        "title": "Host",
+                        "value": msg['host']
+                    }
+                ]
+            }
+        ]
+    }
+
+    # Sending elk message
+    req = urllib2.Request(webhook_url, json.dumps(elk_message))
 
     try:
         resp = urllib2.urlopen(req)
